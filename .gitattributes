@@ -1,3 +1,4 @@
+*.pcapng filter=lfs diff=lfs merge=lfs -text
 *.md filter=lfs diff=lfs merge=lfs -text
 *.py !text !filter !merge !diff
 *.vert !text !filter !merge !diff
