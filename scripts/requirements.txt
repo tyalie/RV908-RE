@@ -1,0 +1,6 @@
+IPython
+pwntools
+matplotlib
+ipdb
+pypcapkit
+dpkt
