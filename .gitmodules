@@ -1,0 +1,3 @@
+[submodule "protocol-dissector"]
+	path = protocol-dissector
+	url = https://github.com/tyalie/linsn-led-protocol-dissector.git
