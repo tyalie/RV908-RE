@@ -1,4 +1,6 @@
 scapy
-pyshark
-ptpython
 aiofile
+numpy
+moderngl
+pyopengltk
+async_tkinter_loop
