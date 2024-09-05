@@ -1,9 +1,11 @@
 from scapy.all import Packet, PcapWriter
 
 import random
+from pathlib import Path
 from network import NetworkSocket, LinsnLEDSend
 from network.packet_recv import LinsnLEDRecv
 from simulator.statemachine import RV908StateMachine
+from simulator.rv908memory import RV908Memory
 from ui import StatusWindowProcess
 
 class Simulator():
@@ -13,7 +15,9 @@ class Simulator():
         if with_gui:
             self._gui = StatusWindowProcess()
 
-        self._sm = RV908StateMachine(receiver_mac="01:23:45:67:89:ab")
+        self._memory = RV908Memory(Path(__file__).parent / "./memory.hex", adapt_memory)
+
+        self._sm = RV908StateMachine(receiver_mac="01:23:45:67:89:ab", memory=self._memory)
         self._sm.register_send_cbk(self._socket.send_package)
 
         self._pcapw = PcapWriter("failed_packages.pcap")
@@ -65,7 +69,8 @@ class Simulator():
             self._write_pkt_to_file(pkg.underlayer)
             return
 
-        if pkg.parent is not None and pkg.parent.dst == "ff:ff:ff:ff:ff:ff":
+        if pkg.underlayer is not None and pkg.underlayer.dst == "ff:ff:ff:ff:ff:ff":
             await self._sm.recv_discovery_broadcast(pkg.sender_mac)
-        else:
-            ...
+        elif isinstance(pkg.cmd_data, LinsnLEDSend.CmdsConfigData):
+            confd: LinsnLEDSend.CmdsConfigData = pkg.cmd_data
+            self._sm.recv_memory_setting(str(confd.flag) == "cmd_bounds", confd.idx, confd.address, confd.data)

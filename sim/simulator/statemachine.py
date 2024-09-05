@@ -6,6 +6,8 @@ from statemachine.states import States, State
 from network import LinsnLEDRecv
 from scapy.all import Packet, Ether
 
+from simulator.rv908memory import RV908Memory, VerificationException
+
 
 class CustomStateMachine(StateMachineMetaclass):
     """
@@ -52,8 +54,7 @@ class RV908StateMachine(StateMachine, metaclass=CustomStateMachine):
     frame_end = states.RECEIVING_FRAME.to(states.WAITING_4_FRAME)
 
 
-    def __init__(self, receiver_mac: str, secret: bytes = b"", *args, **kwargs):
-    def __init__(self, receiver_mac: str, *args, **kwargs):
+    def __init__(self, receiver_mac: str, memory: RV908Memory, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         self.receiver_mac : str = receiver_mac
@@ -61,7 +62,12 @@ class RV908StateMachine(StateMachine, metaclass=CustomStateMachine):
 
         self._sender_mac : None | bytes = None
 
+        self._memory = memory
+        self._prev_cmd_idx = None
+        self.in_command_setting = False
+
         self.init()  # initialise system
+
 
     def on_enter_state(self, event, state: State):
         print(f"Entering `{state.id} state from `{event}` event.")
@@ -90,3 +96,29 @@ class RV908StateMachine(StateMachine, metaclass=CustomStateMachine):
         )
 
         await self._send_msg(pkt)
+
+    def recv_memory_setting(self, is_bound: bool, pkt_idx: int, addr: int, data: bytes):
+        if self._prev_cmd_idx == pkt_idx:
+            return  # cmd packages are send repeatedly and often
+        self._prev_cmd_idx = pkt_idx
+
+        if is_bound:
+            if data[0] == 0x55:  # start
+                if self.in_command_setting:
+                    print("Already inside command. What happend?")
+                else:
+                    self.in_command_setting = True
+                print("Memory Update:")
+            elif data[0] == 0x00:  # end
+                if not self.in_command_setting:
+                    print("Already outside command. What happend?")
+                else:
+                    self.in_command_setting = False
+            else:
+                raise Exception(f"Unknown state for bound cmd {data[0]}")
+        else:
+            print(f"{addr:04X}  {data.hex(' ')}")
+            try:
+                self._memory[addr:addr+16] = data
+            except VerificationException as e:
+                print("- error:", str(e))
