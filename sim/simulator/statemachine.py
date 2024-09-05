@@ -53,9 +53,9 @@ class RV908StateMachine(StateMachine, metaclass=CustomStateMachine):
 
 
     def __init__(self, receiver_mac: str, secret: bytes = b"", *args, **kwargs):
+    def __init__(self, receiver_mac: str, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.secret : bytes = secret
         self.receiver_mac : str = receiver_mac
         self._callback : None | Callable[[Packet], Awaitable[None]] = None
 

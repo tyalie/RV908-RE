@@ -7,14 +7,13 @@ from simulator.statemachine import RV908StateMachine
 from ui import StatusWindowProcess
 
 class Simulator():
-    def __init__(self, socket: NetworkSocket, with_gui: bool = True) -> None:
+    def __init__(self, socket: NetworkSocket, with_gui: bool = True, adapt_memory: bool = False) -> None:
         self._socket = socket
         self._gui: None | StatusWindowProcess = None
         if with_gui:
             self._gui = StatusWindowProcess()
 
-        self.secret = random.randbytes(18)
-        self._sm = RV908StateMachine(receiver_mac="01:23:45:67:89:ab", secret=self.secret)
+        self._sm = RV908StateMachine(receiver_mac="01:23:45:67:89:ab")
         self._sm.register_send_cbk(self._socket.send_package)
 
         self._pcapw = PcapWriter("failed_packages.pcap")
