@@ -2,18 +2,22 @@
 Handling of the network interface (here tap interface)
 and parsing of that data.
 """
+from scapy.all import Ether, Packet, raw
+
 import aiofile
 import struct
 import fcntl
-from .package_send import LinsnLEDSend  # we need this, as otherwise it isn't registered
-from scapy.all import Ether, Packet
+import network.packet_recv
+import network.packet_send  # we need this, as otherwise it isn't registered
+
 
 MTU_USED = 1500
 
 class NetworkSocket:
-    def __init__(self, tap_name: str):
+    def __init__(self, tap_name: str, transparent_mode: bool = False):
         self.tap_name : bytes = tap_name.encode("ascii")
         self.tap_dev : None | aiofile.BinaryFileWrapper = None
+        self.transparent_mode = transparent_mode
 
     def open(self):
         if self.tap_dev is not None:
@@ -38,6 +42,17 @@ class NetworkSocket:
         if self.tap_dev is not None:
             await self.tap_dev.close()
             self.tap_dev = None
+
+    async def send_package(self, data: Packet):
+        if self.transparent_mode:
+            print(f"Would have send: {data} - skipping")
+            return
+
+        _dev = self.tap_dev
+        if _dev is None:
+            raise RuntimeError("Net Device is closed")
+
+        await _dev.write(raw(data))
 
     async def receive_package(self) -> Packet | tuple[int, bytes]:
         _dev = self.tap_dev

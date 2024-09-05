@@ -1,24 +1,26 @@
 #!/usr/bin/env python3
 from argparse import ArgumentParser
 import asyncio
+from scapy.config import conf
 
 from network import NetworkSocket
-from sim import Simulator
+from simulator import Simulator
 
 def get_args():
     parser = ArgumentParser()
+    parser.add_argument("--headless", help="Start without gui", action="store_true")
     parser.add_argument("-i", "--interface", help="TAP interface name to be used", required=True)
-    parser.add_argument("-l", "--lua-param", default=None, help="Lua path for tshark (argument -X)")
+    parser.add_argument("-t", "--transparent", help="Transparent mode: No data will be send", action="store_true")
 
     return parser.parse_args()
 
 def main():
     args = get_args()
-    print(args)
 
-    socket = NetworkSocket(args.interface)
+    socket = NetworkSocket(args.interface, args.transparent)
+    conf.debug_dissector = True
 
-    sim = Simulator(socket)
+    sim = Simulator(socket, with_gui=not args.headless)
     sim.start_ui()
 
     asyncio.run(sim.run())

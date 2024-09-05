@@ -2,11 +2,6 @@ from scapy.all import Packet_metaclass, PacketField, Packet, AnyField, Field
 from typing import TypeVar, Callable, Generic, Any
 import types
 
-class ChoicePacketField(PacketField):
-    """A package field, that has a callable as the third argument, which it uses to select to correct packet class"""
-    def m2i(self, pkt: None | Packet, m: bytes) -> Packet:
-        return self.cls(pkt, m)
-
 I = TypeVar('I')  # Internal storage  # noqa: E741
 M = TypeVar('M')  # Machine storage
 
