@@ -9,18 +9,18 @@ from simulator.rv908memory import RV908Memory
 from ui import StatusWindowProcess
 
 class Simulator():
-    def __init__(self, socket: NetworkSocket, with_gui: bool = True, adapt_memory: bool = False) -> None:
+    def __init__(self, socket: NetworkSocket, with_gui: bool = True, adapt_memory: bool = False, tmp_folder: Path = Path("./")) -> None:
         self._socket = socket
         self._gui: None | StatusWindowProcess = None
         if with_gui:
             self._gui = StatusWindowProcess()
 
-        self._memory = RV908Memory(Path(__file__).parent / "./memory.hex", adapt_memory)
+        self._memory = RV908Memory(Path(__file__).parent / "./memory.hex", adapt_memory, memory_dump_dir=tmp_folder)
 
         self._sm = RV908StateMachine(receiver_mac="01:23:45:67:89:ab", memory=self._memory)
         self._sm.register_send_cbk(self._socket.send_package)
 
-        self._pcapw = PcapWriter("failed_packages.pcap")
+        self._pcapw = PcapWriter(tmp_folder / "failed_packages.pcap")
 
     def start_ui(self):
         if self._gui is None:

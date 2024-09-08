@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 from argparse import ArgumentParser
+from pathlib import Path
 import asyncio
 from scapy.config import conf
 
@@ -12,6 +13,7 @@ def get_args():
     parser.add_argument("-i", "--interface", help="TAP interface name to be used", required=True)
     parser.add_argument("-t", "--transparent", help="Transparent mode: No data will be send", action="store_true")
     parser.add_argument("--adapt-memory", help="Turn on memory pattern adaptation aka only unknown changes to memory in comparision to previous will raise error", action="store_true")
+    parser.add_argument("--tmp", help="Folder used for temporary files (e.g. failed packages, memory dumps, …)", type=str, default="./tmp")
 
     return parser.parse_args()
 
@@ -21,7 +23,7 @@ def main():
     socket = NetworkSocket(args.interface, args.transparent)
     conf.debug_dissector = True
 
-    sim = Simulator(socket, with_gui=not args.headless, adapt_memory=args.adapt_memory)
+    sim = Simulator(socket, with_gui=not args.headless, adapt_memory=args.adapt_memory, tmp_folder=Path(args.tmp))
     sim.start_ui()
 
     asyncio.run(sim.run())

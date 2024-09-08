@@ -1,5 +1,6 @@
 from enum import Enum
 from typing import Callable, Awaitable
+from pathlib import Path
 from statemachine import StateMachine
 from statemachine.statemachine import InvalidDefinition, StateMachineMetaclass
 from statemachine.states import States, State
@@ -113,7 +114,10 @@ class RV908StateMachine(StateMachine, metaclass=CustomStateMachine):
                 if not self.in_command_setting:
                     print("Already outside command. What happend?")
                 else:
+                    self._memory.store_dump()
                     self.in_command_setting = False
+
+                self._memory.parse()
             else:
                 raise Exception(f"Unknown state for bound cmd {data[0]}")
         else:

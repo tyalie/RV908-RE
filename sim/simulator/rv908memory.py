@@ -36,7 +36,7 @@ class RV908Memory(metaclass=MemoryMeta):
     class Parameters():
         global_brightness: int = 0
 
-    def __init__(self, pattern_file: str | Path, adapt: bool = False) -> None:
+    def __init__(self, pattern_file: str | Path, adapt: bool = False, memory_dump_dir: None | Path = None) -> None:
 
         self._pattern_parsers = {}
         self._pattern_arr = bytearray(self.MEMORY_SIZE)
@@ -46,6 +46,7 @@ class RV908Memory(metaclass=MemoryMeta):
         self._memory = bytearray(self._pattern_arr)
         self.params = RV908Memory.Parameters()
         self._should_adapt = adapt
+        self._memory_dump_dir = memory_dump_dir
 
     def _load_pattern(self, file: Path):
         with open(file, "r") as fp:
@@ -134,7 +135,22 @@ class RV908Memory(metaclass=MemoryMeta):
             if self._should_adapt:
                 self._pattern_arr[addr] = value
 
-        self.parse()
+    def store_dump(self):
+        if self._memory_dump_dir is None or not self._memory_dump_dir.is_dir():
+            print("Error writing memory dump")
+            return
+        # determine max idx
+        max_idx = -1
+        for f in self._memory_dump_dir.iterdir():
+            if (m := re.match(r"(\d+).bin", f.name)):
+                max_idx = max(max_idx, int(m.group(1)))
+
+        # write to next free idx
+        name = f"{max_idx + 1:04}.bin"
+        with (self._memory_dump_dir / name).open("wb") as fp:
+            fp.write(self._memory)
+
+        print(f"-- Written memory dump to {name}")
 
     #############################################
     ##                PARSERS                  ##
