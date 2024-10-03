@@ -37,6 +37,7 @@ class NetworkSocket:
         assert isinstance(_dev, aiofile.BinaryFileWrapper), "Incorrect file mode (not binary)"
 
         self.tap_dev = _dev
+        self.prev_idx = None
 
     async def close(self):
         if self.tap_dev is not None:
@@ -59,6 +60,7 @@ class NetworkSocket:
         if _dev is None:
             raise RuntimeError("Net Device is closed")
 
+
         while True:
             # the ethernet frame has at most 22 bytes of additional data
             rdata = await _dev.read(MTU_USED + 22)
@@ -67,11 +69,21 @@ class NetworkSocket:
             # As the bulk (>99%) of packets are very simple image frames, we can add an exception
             # for handling these and parse them significantly quicker, giving us ample time to
             # fully parse and validate these packets that require our attention.
-            # protocol = 0xaa55
-            # first 32 bytes of data (except pkg num) are zeros
-            if rdata[12] == 0xaa and rdata[13] == 0x55 and rdata[16:48 - 2] == b'\x00'*30:
+            # - protocol = 0xaa55
+            # + select one:
+            #   - first 32 bytes of data (except pkg num) are zeros
+            #   - cmd package and idx bits == prev_idx
+            _idx = None
+            if rdata[12] == 0xaa and rdata[13] == 0x55 and (
+                    rdata[16:48 - 2] == b'\x00'*30 or (
+                        rdata[16:23] == network.packet_send.LinsnCMDs.CONFIG and
+                        (_idx := rdata[25] & 0b111) == self.prev_idx
+                    )):
                 # skipped package because it's one of these image frames
                 return int.from_bytes(rdata[14:16], "little", signed=False), rdata[48:]
+
+            if _idx:
+                self.prev_idx = _idx
 
             return Ether(rdata)
 
