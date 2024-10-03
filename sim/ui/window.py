@@ -1,5 +1,4 @@
 import tkinter
-from .status_widget import StatusWidget
 import multiprocessing as mlp
 from multiprocessing import shared_memory
 import queue
@@ -25,8 +24,10 @@ class StatusWindowProcess(mlp.Process):
         class it is a bit easier to handle the Tk internal states
         and especially it's problems with e.g. multithreading.
         """
+
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
+            from .status_widget import StatusWidget
 
             self.wm_title("Linsn RE 980 Sim")
             self.geometry("400x400")  # TODO
