@@ -6,9 +6,15 @@ from statemachine.statemachine import InvalidDefinition, StateMachineMetaclass
 from statemachine.states import States, State
 from network import LinsnLEDRecv
 from scapy.all import Packet, Ether
+from network.packet_send import LinsnLEDSend
 
 from simulator.rv908memory import RV908Memory, VerificationException
 
+class StateException(Exception):
+    ...
+
+class WrongDelimiterStateException(StateException):
+    ...
 
 class CustomStateMachine(StateMachineMetaclass):
     """
@@ -65,7 +71,7 @@ class RV908StateMachine(StateMachine, metaclass=CustomStateMachine):
 
         self._memory = memory
         self._prev_cmd_idx = None
-        self.in_command_setting = False
+        self.in_transfer_type = 0
 
         self.init()  # initialise system
 
@@ -98,31 +104,45 @@ class RV908StateMachine(StateMachine, metaclass=CustomStateMachine):
 
         await self._send_msg(pkt)
 
-    def recv_memory_setting(self, is_bound: bool, pkt_idx: int, addr: int, data: bytes):
-        if self._prev_cmd_idx == pkt_idx:
+    def recv_memory_setting(self, confd: LinsnLEDSend.CmdsConfigData, printout: bool = True):
+        if self._prev_cmd_idx == confd.idx:
             return  # cmd packages are send repeatedly and often
-        self._prev_cmd_idx = pkt_idx
+        self._prev_cmd_idx = confd.idx
 
-        if is_bound:
-            if data[0] == 0x55:  # start
-                if self.in_command_setting:
-                    print("Already inside command. What happend?")
-                else:
-                    self.in_command_setting = True
-                print("Memory Update:")
-            elif data[0] == 0x00:  # end
-                if not self.in_command_setting:
-                    print("Already outside command. What happend?")
-                else:
-                    self._memory.store_dump()
-                    self.in_command_setting = False
+        if printout:
+            self.print_memory_update(confd)
 
-                self._memory.parse()
-            else:
-                raise Exception(f"Unknown state for bound cmd {data[0]}")
-        else:
-            print(f"{addr:04X}  {data.hex(' ')}")
-            try:
-                self._memory[addr:addr+16] = data
-            except VerificationException as e:
-                print("- error:", str(e))
+        try:
+            match confd.type_e:
+                case confd.TypeEnum.CONF if confd.data[0] in [0x55, 0x99]:
+                    # start of transfer
+                    if self.in_transfer_type:
+                        raise WrongDelimiterStateException(f"Already inside command", confd)
+                    self.in_transfer_type = confd.data[0]
+                case confd.TypeEnum.CONF if confd.data[0] == 0x00:
+                    # end of transfer / store and parse
+                    if not self.in_transfer_type:
+                        raise WrongDelimiterStateException(f"Already outside command", confd)
+                    else:
+                        self._memory.store_dump()
+                        self.in_transfer_type = 0
+
+                    self._memory.parse()
+                case confd.TypeEnum.PERM_CONF if confd.data[0:2] == b"\x00\x00" and self.in_transfer_type == 0x99:
+                    # erase 4kiB
+                    self._memory[confd.address:confd.address + 0x1000] = b"\xFF" * 0x1000
+                case v if v == {0x55: confd.TypeEnum.TMP_DATA, 0x99: confd.TypeEnum.PERM_DATA}.get(self.in_transfer_type, None):
+                    # data is being written
+                    self._memory[confd.address:confd.address+16] = confd.data
+                case _:
+                    raise StateException(f"Unknown state", confd)
+        except VerificationException as e:
+            print("- error:", str(e))
+
+    def print_memory_update(self, confd):
+        _ = f"{confd.idx:1X} {confd.type_e.short_name():>2}|"
+        _ += "D" if confd.is_data else " "
+        _ += "|"
+
+        print(_, end="")
+        print(f"{confd.address:06X}  {confd.data.hex(' ')}")
