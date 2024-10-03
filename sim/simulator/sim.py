@@ -1,6 +1,5 @@
-from scapy.all import Packet, PcapWriter
+from scapy.all import Packet, PcapWriter, IP, IPv6
 
-import random
 from pathlib import Path
 from network import NetworkSocket, LinsnLEDSend
 from network.packet_recv import LinsnLEDRecv
@@ -20,7 +19,7 @@ class Simulator():
         self._sm = RV908StateMachine(receiver_mac="01:23:45:67:89:ab", memory=self._memory)
         self._sm.register_send_cbk(self._socket.send_package)
 
-        self._pcapw = PcapWriter(tmp_folder / "failed_packages.pcap")
+        self._pcapw = PcapWriter(str(tmp_folder / "failed_packages.pcap"))
 
     def start_ui(self):
         if self._gui is None:
@@ -47,6 +46,8 @@ class Simulator():
                         await self._handle_linsn_send_data(data.payload)
                     elif LinsnLEDRecv in data:
                         await self._handle_linsn_recv_data(data.payload)
+                    elif IP in data or IPv6 in data:
+                        ...
                     else:
                         print(f"unknown package received - ignoring {data}")
                         #data.show()
@@ -70,7 +71,7 @@ class Simulator():
             return
 
         if pkg.underlayer is not None and pkg.underlayer.dst == "ff:ff:ff:ff:ff:ff":
-            await self._sm.recv_discovery_broadcast(pkg.sender_mac)
+            await self._sm.recv_discovery_broadcast(pkg.cmd_data.sender_mac)
         elif isinstance(pkg.cmd_data, LinsnLEDSend.CmdsConfigData):
             confd: LinsnLEDSend.CmdsConfigData = pkg.cmd_data
             self._sm.recv_memory_setting(str(confd.flag) == "cmd_bounds", confd.idx, confd.address, confd.data)
