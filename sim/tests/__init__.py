@@ -1,0 +1,7 @@
+
+import tests.network
+import tests.simulator
+import unittest
+
+if __name__ == "__main__":
+    unittest.main()
